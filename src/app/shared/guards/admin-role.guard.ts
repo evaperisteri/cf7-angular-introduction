@@ -12,5 +12,5 @@ console.log("ADMIN ROLE GUARD", userRoles, hasPermission)
 
 if(userService.user$() && hasPermission){
   return true;
-  } return router.navigate(['login'])
+  } return router.navigate(['restricted-content'])
 };
