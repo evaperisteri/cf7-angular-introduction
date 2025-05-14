@@ -1,8 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from 'src/environments/environment.development';
 import { User, Credentials, LoggedInUser} from '../interfaces/user';
 import { Router } from '@angular/router';
+import { jwtDecode } from 'jwt-decode';
 
 const API_URL = `${environment.apiURL}/api/users`
 const API_URL_AUTH = `${environment.apiURL}/api/auth`
@@ -15,6 +16,25 @@ export class UserService {
   router = inject(Router);
 
   user$ = signal<LoggedInUser|null>(null)
+
+  constructor(){
+    const access_token = localStorage.getItem("access_token");
+    if(access_token) {
+      const decodedTokenSubject = jwtDecode(access_token) as unknown as LoggedInUser
+      this.user$.set({
+        username: decodedTokenSubject.username,
+        email: decodedTokenSubject.email,
+        roles: decodedTokenSubject.roles
+      })
+    }
+    effect(()=>{
+      if (this.user$()){
+        console.log('user logged in', this.user$()?.username);
+      } else {
+        console.log('no user logged in');
+      }
+    })
+  }
   
   registerUser(user: User) {
     return this.http.post<{status: boolean, data: User}>(`${API_URL}`, user)
@@ -32,5 +52,29 @@ export class UserService {
     this.user$.set(null);
     localStorage.removeItem('access_token');
     this.router.navigate(['login']);
+  }
+
+  isTokenExpired():boolean {
+    const token = localStorage.getItem('access_token');
+    if(!token) return true;
+    try {
+      const decoded = jwtDecode(token);
+      const exp = decoded.exp;
+      const now = Math.floor(Date.now()/1000);
+      if (exp) {
+      return (exp < now);
+      } else {return true}
+    } catch (error){
+      return true
+    }
+  }
+  redirectToGoogleLogin(){
+    const clientId = '350591074954-1uj52u54ua4h7583cc641uqt60fghq1u.apps.googleusercontent.com';
+    const redirectUri = 'http://localhost:3000/api/auth/google/callback';
+    const scope = 'email profile';
+    const responseType = 'code';
+    const accessType = 'offline';
+    const url = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=${responseType}&scope=${scope}&access_type=${accessType}`;
+    window.location.href = url;
   }
 }
